@@ -1,86 +1,23 @@
-import { useEffect, useState } from 'preact/hooks';
-
-interface Feed {
-	name: string;
-	url: string;
-}
+import { useState } from 'preact/hooks';
 
 interface FeedItem {
 	title: string;
 	link: string;
-	date: Date;
+	date: string;
 	source: string;
 }
 
 interface Props {
-	feeds: Feed[];
+	items: FeedItem[];
+	sources: string[];
 }
 
-const CORS_PROXIES = [
-	(url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-	(url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-];
-
-async function fetchWithProxy(url: string): Promise<string> {
-	for (const proxyFn of CORS_PROXIES) {
-		try {
-			const proxyUrl = proxyFn(url);
-			const response = await fetch(proxyUrl);
-			if (response.ok) {
-				return await response.text();
-			}
-		} catch {
-			continue;
-		}
-	}
-	throw new Error('All proxies failed');
+function formatDate(dateStr: string): string {
+	return dateStr.split('T')[0];
 }
 
-async function fetchFeed(feed: Feed): Promise<FeedItem[]> {
-	try {
-		const text = await fetchWithProxy(feed.url);
-		const parser = new DOMParser();
-		const xml = parser.parseFromString(text, 'text/xml');
-
-		const items: FeedItem[] = [];
-
-		// Try RSS format
-		const rssItems = xml.querySelectorAll('item');
-		rssItems.forEach((item) => {
-			const title = item.querySelector('title')?.textContent || 'Untitled';
-			const link = item.querySelector('link')?.textContent || '#';
-			const pubDate = item.querySelector('pubDate')?.textContent;
-			const date = pubDate ? new Date(pubDate) : new Date();
-
-			items.push({ title, link, date, source: feed.name });
-		});
-
-		// Try Atom format
-		const atomEntries = xml.querySelectorAll('entry');
-		atomEntries.forEach((entry) => {
-			const title = entry.querySelector('title')?.textContent || 'Untitled';
-			const linkEl = entry.querySelector('link[href]');
-			const link = linkEl?.getAttribute('href') || '#';
-			const published =
-				entry.querySelector('published')?.textContent ||
-				entry.querySelector('updated')?.textContent;
-			const date = published ? new Date(published) : new Date();
-
-			items.push({ title, link, date, source: feed.name });
-		});
-
-		return items;
-	} catch (error) {
-		console.error(`Error fetching ${feed.name}:`, error);
-		return [];
-	}
-}
-
-function formatDate(date: Date): string {
-	return date.toISOString().split('T')[0];
-}
-
-function getTimeCategory(date: Date): 'today' | 'week' | 'older' {
+function getTimeCategory(dateStr: string): 'today' | 'week' | 'older' {
+	const date = new Date(dateStr);
 	const now = new Date();
 	const diffMs = now.getTime() - date.getTime();
 	const diffHours = diffMs / (1000 * 60 * 60);
@@ -121,9 +58,6 @@ const styles = {
 		background: '#1a1a1a',
 		color: '#ffffff',
 		borderColor: '#1a1a1a',
-	},
-	status: {
-		color: '#666666',
 	},
 	list: {
 		listStyle: 'none',
@@ -171,16 +105,15 @@ const styles = {
 		height: '1px',
 		background: '#e0e0e0',
 	},
+	empty: {
+		color: '#666666',
+	},
 };
 
-export default function FeedReader({ feeds }: Props) {
-	const [items, setItems] = useState<FeedItem[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState(false);
-	const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(feeds.map((f) => f.name)));
+export default function FeedDisplay({ items, sources }: Props) {
+	const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(sources));
 	const [showFilters, setShowFilters] = useState(false);
 
-	const sources = feeds.map((f) => f.name);
 	const allSelected = selectedSources.size === sources.length;
 
 	const toggleSource = (source: string) => {
@@ -201,45 +134,7 @@ export default function FeedReader({ feeds }: Props) {
 		}
 	};
 
-	useEffect(() => {
-		async function loadFeeds() {
-			setLoading(true);
-			setError(false);
-
-			const results = await Promise.all(feeds.map((feed) => fetchFeed(feed)));
-			const allItems = results.flat();
-
-			if (allItems.length === 0) {
-				setError(true);
-			} else {
-				allItems.sort((a, b) => b.date.getTime() - a.date.getTime());
-				setItems(allItems);
-			}
-
-			setLoading(false);
-		}
-
-		loadFeeds();
-	}, [feeds]);
-
 	const filteredItems = items.filter((item) => selectedSources.has(item.source));
-
-	const handleRefresh = () => {
-		setItems([]);
-		setLoading(true);
-		setError(false);
-
-		Promise.all(feeds.map((feed) => fetchFeed(feed))).then((results) => {
-			const allItems = results.flat();
-			if (allItems.length === 0) {
-				setError(true);
-			} else {
-				allItems.sort((a, b) => b.date.getTime() - a.date.getTime());
-				setItems(allItems);
-			}
-			setLoading(false);
-		});
-	};
 
 	// Group items by time category
 	const todayItems = filteredItems.filter((item) => getTimeCategory(item.date) === 'today');
@@ -274,6 +169,10 @@ export default function FeedReader({ feeds }: Props) {
 		</div>
 	);
 
+	if (items.length === 0) {
+		return <p style={styles.empty}>No feeds loaded.</p>;
+	}
+
 	return (
 		<div>
 			<div style={styles.controls}>
@@ -286,17 +185,6 @@ export default function FeedReader({ feeds }: Props) {
 						onClick={() => setShowFilters(!showFilters)}
 					>
 						Filter
-					</button>
-					<button
-						style={{
-							...styles.button,
-							opacity: loading ? 0.5 : 1,
-							cursor: loading ? 'not-allowed' : 'pointer',
-						}}
-						onClick={handleRefresh}
-						disabled={loading}
-					>
-						{loading ? 'Loading...' : 'Refresh'}
 					</button>
 				</div>
 				{showFilters && (
@@ -326,42 +214,28 @@ export default function FeedReader({ feeds }: Props) {
 				)}
 			</div>
 
-			{loading && <p style={styles.status}>Loading feeds...</p>}
+			{filteredItems.length === 0 && <p style={styles.empty}>No posts match the filter.</p>}
 
-			{error && !loading && (
-				<p style={styles.status}>Could not load feeds. Try refreshing.</p>
-			)}
-
-			{!loading && !error && filteredItems.length === 0 && (
-				<p style={styles.status}>No posts found.</p>
-			)}
-
-			{!loading && filteredItems.length > 0 && (
+			{filteredItems.length > 0 && (
 				<div>
 					{todayItems.length > 0 && (
 						<>
 							{renderDivider('Last 24 hours')}
-							<ul style={styles.list}>
-								{todayItems.map(renderItem)}
-							</ul>
+							<ul style={styles.list}>{todayItems.map(renderItem)}</ul>
 						</>
 					)}
 
 					{weekItems.length > 0 && (
 						<>
 							{renderDivider('This week')}
-							<ul style={styles.list}>
-								{weekItems.map(renderItem)}
-							</ul>
+							<ul style={styles.list}>{weekItems.map(renderItem)}</ul>
 						</>
 					)}
 
 					{olderItems.length > 0 && (
 						<>
 							{renderDivider('Older')}
-							<ul style={styles.list}>
-								{olderItems.slice(0, 30).map(renderItem)}
-							</ul>
+							<ul style={styles.list}>{olderItems.map(renderItem)}</ul>
 						</>
 					)}
 				</div>

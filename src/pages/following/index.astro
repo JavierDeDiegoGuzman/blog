@@ -2,15 +2,98 @@
 import BaseHead from '../../components/BaseHead.astro';
 import Footer from '../../components/Footer.astro';
 import Header from '../../components/Header.astro';
-import FeedReader from '../../components/islands/FeedReader';
+import FeedDisplay from '../../components/islands/FeedDisplay';
 import { SITE_TITLE } from '../../consts';
 import feeds from '../../data/feeds.json';
+
+interface FeedItem {
+	title: string;
+	link: string;
+	date: string;
+	source: string;
+}
+
+async function fetchFeed(feed: { name: string; url: string }): Promise<FeedItem[]> {
+	try {
+		const response = await fetch(feed.url);
+		if (!response.ok) return [];
+
+		const text = await response.text();
+		const items: FeedItem[] = [];
+
+		// Parse RSS items
+		const rssItemRegex = /<item>([\s\S]*?)<\/item>/g;
+		let match;
+		while ((match = rssItemRegex.exec(text)) !== null) {
+			const itemContent = match[1];
+			const title = itemContent.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1] || 'Untitled';
+			const link = itemContent.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/)?.[1] || '#';
+			const pubDate = itemContent.match(/<pubDate>(.*?)<\/pubDate>/)?.[1];
+			const date = pubDate ? new Date(pubDate).toISOString() : new Date().toISOString();
+
+			items.push({ title: title.trim(), link: link.trim(), date, source: feed.name });
+		}
+
+		// Parse Atom entries
+		const atomEntryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+		while ((match = atomEntryRegex.exec(text)) !== null) {
+			const entryContent = match[1];
+			const title = entryContent.match(/<title[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1] || 'Untitled';
+			const linkMatch = entryContent.match(/<link[^>]*href=["']([^"']+)["']/);
+			const link = linkMatch?.[1] || '#';
+			const published = entryContent.match(/<published>(.*?)<\/published>/)?.[1] ||
+			                  entryContent.match(/<updated>(.*?)<\/updated>/)?.[1];
+			const date = published ? new Date(published).toISOString() : new Date().toISOString();
+
+			items.push({ title: title.trim(), link, date, source: feed.name });
+		}
+
+		return items;
+	} catch (error) {
+		console.error(`Error fetching ${feed.name}:`, error);
+		return [];
+	}
+}
+
+// Fetch all feeds at build time
+const allItems: FeedItem[] = [];
+for (const feed of feeds.feeds) {
+	const items = await fetchFeed(feed);
+	allItems.push(...items);
+}
+
+// Sort by date, newest first
+allItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+// Take latest 100 items
+const feedItems = allItems.slice(0, 100);
+const sources = feeds.feeds.map(f => f.name);
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
 		<BaseHead title={`Following | ${SITE_TITLE}`} description="RSS feeds I follow" />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<h1>Following</h1>
+			<p class="description">Latest posts from blogs I follow.</p>
+
+			<FeedDisplay client:load items={feedItems} sources={sources} />
+
+			<div class="feed-list">
+				<h2>Feeds</h2>
+				<ul>
+					{feeds.feeds.map((feed) => (
+						<li><a href={feed.url} target="_blank" rel="noreferrer">{feed.name}</a></li>
+					))}
+				</ul>
+			</div>
+		</main>
+		<Footer />
+
 		<style>
 			h1 {
 				margin-bottom: 0.5rem;
@@ -19,95 +102,6 @@ import feeds from '../../data/feeds.json';
 			.description {
 				color: var(--color-text-muted);
 				margin-bottom: 2rem;
-			}
-
-			.controls {
-				display: flex;
-				justify-content: space-between;
-				align-items: center;
-				margin-bottom: 1.5rem;
-				flex-wrap: wrap;
-				gap: 1rem;
-			}
-
-			.filter {
-				display: flex;
-				gap: 0.5rem;
-				flex-wrap: wrap;
-			}
-
-			.filter button,
-			.refresh {
-				background: none;
-				border: 1px solid var(--color-border);
-				padding: 0.25rem 0.75rem;
-				font-size: 0.875rem;
-				font-family: inherit;
-				cursor: pointer;
-				color: var(--color-text-muted);
-				transition: all 150ms ease;
-			}
-
-			.filter button:hover,
-			.refresh:hover {
-				border-color: var(--color-text-muted);
-				color: var(--color-text);
-			}
-
-			.filter button.active {
-				background: var(--color-text);
-				color: var(--color-bg);
-				border-color: var(--color-text);
-			}
-
-			.refresh:disabled {
-				opacity: 0.5;
-				cursor: not-allowed;
-			}
-
-			.status {
-				color: var(--color-text-muted);
-			}
-
-			.status.error {
-				color: #666;
-			}
-
-			ul {
-				list-style: none;
-				padding: 0;
-				margin: 0;
-			}
-
-			li {
-				margin-bottom: 0.75rem;
-			}
-
-			.entry {
-				display: flex;
-				gap: 0.5rem;
-				align-items: baseline;
-				flex-wrap: wrap;
-			}
-
-			.date {
-				font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-				font-size: 0.875rem;
-				color: var(--color-text-muted);
-				flex-shrink: 0;
-			}
-
-			.separator {
-				color: var(--color-text-muted);
-			}
-
-			.title {
-				color: var(--color-text);
-			}
-
-			.source {
-				font-size: 0.875rem;
-				color: var(--color-text-muted);
 			}
 
 			.feed-list {
@@ -126,6 +120,9 @@ import feeds from '../../data/feeds.json';
 			}
 
 			.feed-list ul {
+				list-style: none;
+				padding: 0;
+				margin: 0;
 				font-size: 0.875rem;
 			}
 
@@ -137,24 +134,5 @@ import feeds from '../../data/feeds.json';
 				color: var(--color-text-muted);
 			}
 		</style>
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>Following</h1>
-			<p class="description">Latest posts from blogs I follow.</p>
-
-			<FeedReader client:load feeds={feeds.feeds} />
-
-			<div class="feed-list">
-				<h2>Feeds</h2>
-				<ul>
-					{feeds.feeds.map((feed) => (
-						<li><a href={feed.url} target="_blank" rel="noreferrer">{feed.name}</a></li>
-					))}
-				</ul>
-			</div>
-		</main>
-		<Footer />
 	</body>
 </html>
