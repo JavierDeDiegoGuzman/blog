@@ -6,7 +6,7 @@ on:
 
 jobs:
   add-recommendation:
-    if: contains(github.event.issue.labels.*.name, 'recommendation')
+    if: contains(github.event.issue.labels.*.name, 'recommendation') && github.event.issue.user.login == 'JavierDeDiegoGuzman'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -114,7 +114,7 @@ jobs:
             });
 
   add-feed:
-    if: contains(github.event.issue.labels.*.name, 'feed')
+    if: contains(github.event.issue.labels.*.name, 'feed') && github.event.issue.user.login == 'JavierDeDiegoGuzman'
     runs-on: ubuntu-latest
     permissions:
       contents: write
