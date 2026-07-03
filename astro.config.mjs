@@ -11,6 +11,13 @@ export default defineConfig({
 	integrations: [mdx(), sitemap(), preact()],
 	fonts: [
 		{
+			provider: fontProviders.google(),
+			name: 'Lancelot',
+			cssVariable: '--font-lancelot',
+			fallbacks: ['Georgia', 'serif'],
+			weights: [400],
+		},
+		{
 			provider: fontProviders.local(),
 			name: 'Atkinson',
 			cssVariable: '--font-atkinson',
