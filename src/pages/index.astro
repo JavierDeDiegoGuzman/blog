@@ -1,48 +1,147 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+
+const posts = (await getCollection('posts')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+
+const recommendations = (await getCollection('recommendations')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+
+const formatDate = (date: Date) => date.toISOString().split('T')[0];
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
 		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+		<style>
+			.intro {
+				margin-bottom: 3rem;
+			}
+
+			.intro p {
+				color: var(--color-text-muted);
+				max-width: 60ch;
+				margin: 0;
+			}
+
+			section {
+				margin-bottom: 3rem;
+			}
+
+			.section-label {
+				font-size: 0.75rem;
+				font-weight: 400;
+				text-transform: uppercase;
+				letter-spacing: 0.1em;
+				color: var(--color-text-muted);
+				margin-bottom: 1rem;
+			}
+
+			ul {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+
+			li {
+				margin-bottom: 0.5rem;
+			}
+
+			.entry {
+				display: flex;
+				gap: 0.5rem;
+				align-items: baseline;
+				flex-wrap: wrap;
+			}
+
+			.date {
+				font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+				font-size: 0.875rem;
+				color: var(--color-text-muted);
+				flex-shrink: 0;
+			}
+
+			.separator {
+				color: var(--color-text-muted);
+			}
+
+			.title {
+				color: var(--color-text);
+			}
+
+			.more-link {
+				margin-top: 1rem;
+				font-size: 0.875rem;
+			}
+
+			.more-link a {
+				color: var(--color-text-muted);
+			}
+		</style>
 	</head>
 	<body>
 		<Header />
 		<main>
-			<h1>🧑‍🚀 Hello, Astronaut!</h1>
-			<p>
-				Welcome to the official <a href="https://astro.build/">Astro</a> blog starter template. This template
-				serves as a lightweight, minimally-styled starting point for anyone looking to build a personal
-				website, blog, or portfolio with Astro.
-			</p>
-			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like Tailwind,
-				React, or Vue to your project.
-			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
-			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/content/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
-			</ul>
-			<p>
-				Have fun! If you get stuck, remember to
-				<a href="https://docs.astro.build/">read the docs</a>
-				or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
-			</p>
-			<p>
-				Looking for a blog template with a bit more personality? Check out
-				<a href="https://github.com/Charca/astro-blog-template">astro-blog-template</a>
-				by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
-			</p>
+			<div class="intro">
+				<p>{SITE_DESCRIPTION}</p>
+			</div>
+
+			{posts.length > 0 && (
+				<section>
+					<h2 class="section-label">Posts</h2>
+					<ul>
+						{
+							posts.slice(0, 10).map((post) => (
+								<li>
+									<div class="entry">
+										<time class="date">{formatDate(post.data.pubDate)}</time>
+										<span class="separator">—</span>
+										<a class="title" href={`/posts/${post.id}/`}>
+											{post.data.title}
+										</a>
+									</div>
+								</li>
+							))
+						}
+					</ul>
+					{
+						posts.length > 10 && (
+							<p class="more-link">
+								<a href="/posts">View all posts</a>
+							</p>
+						)
+					}
+				</section>
+			)}
+
+			<section>
+				<h2 class="section-label">Reading</h2>
+				<ul>
+					{
+						recommendations.slice(0, 5).map((rec) => (
+							<li>
+								<div class="entry">
+									<time class="date">{formatDate(rec.data.pubDate)}</time>
+									<span class="separator">—</span>
+									<a class="title" href={rec.data.url} target="_blank" rel="noreferrer">
+										{rec.data.title}
+									</a>
+								</div>
+							</li>
+						))
+					}
+				</ul>
+				<p class="more-link">
+					<a href="/recommended-reading">View all</a>
+				</p>
+			</section>
 		</main>
 		<Footer />
 	</body>

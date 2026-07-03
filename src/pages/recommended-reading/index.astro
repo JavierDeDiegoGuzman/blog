@@ -1,0 +1,188 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../components/BaseHead.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+import { SITE_TITLE } from '../../consts';
+
+const recommendations = (await getCollection('recommendations')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+
+const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+const getTimeCategory = (date: Date): 'today' | 'week' | 'older' => {
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffHours = diffMs / (1000 * 60 * 60);
+	const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+	if (diffHours <= 24) return 'today';
+	if (diffDays <= 7) return 'week';
+	return 'older';
+};
+
+const todayItems = recommendations.filter((r) => getTimeCategory(r.data.pubDate) === 'today');
+const weekItems = recommendations.filter((r) => getTimeCategory(r.data.pubDate) === 'week');
+const olderItems = recommendations.filter((r) => getTimeCategory(r.data.pubDate) === 'older');
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`Reading | ${SITE_TITLE}`} description="Recommended reading" />
+		<style>
+			h1 {
+				margin-bottom: 0.5rem;
+			}
+
+			.description {
+				color: var(--color-text-muted);
+				margin-bottom: 2rem;
+			}
+
+			ul {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+
+			li {
+				margin-bottom: 0.5rem;
+			}
+
+			.entry {
+				display: flex;
+				gap: 0.5rem;
+				align-items: baseline;
+				flex-wrap: wrap;
+			}
+
+			.date {
+				font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+				font-size: 0.875rem;
+				color: var(--color-text-muted);
+				flex-shrink: 0;
+			}
+
+			.separator {
+				color: var(--color-text-muted);
+			}
+
+			.title {
+				color: var(--color-text);
+			}
+
+			.section-divider {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+				margin: 1.5rem 0 1rem;
+				color: var(--color-text-muted);
+				font-size: 0.75rem;
+				text-transform: uppercase;
+				letter-spacing: 0.1em;
+			}
+
+			.section-divider:first-child {
+				margin-top: 0;
+			}
+
+			.divider-line {
+				flex: 1;
+				height: 1px;
+				background: var(--color-border);
+			}
+
+			.rss-link {
+				margin-top: 2rem;
+				font-size: 0.875rem;
+			}
+
+			.rss-link a {
+				color: var(--color-text-muted);
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<h1>Reading</h1>
+			<p class="description">External articles, essays, and resources worth keeping around.</p>
+
+			{todayItems.length > 0 && (
+				<>
+					<div class="section-divider">
+						<span class="divider-line"></span>
+						<span>Last 24 hours</span>
+						<span class="divider-line"></span>
+					</div>
+					<ul>
+						{todayItems.map((rec) => (
+							<li>
+								<div class="entry">
+									<time class="date">{formatDate(rec.data.pubDate)}</time>
+									<span class="separator">—</span>
+									<a class="title" href={rec.data.url} target="_blank" rel="noreferrer">
+										{rec.data.title}
+									</a>
+								</div>
+							</li>
+						))}
+					</ul>
+				</>
+			)}
+
+			{weekItems.length > 0 && (
+				<>
+					<div class="section-divider">
+						<span class="divider-line"></span>
+						<span>This week</span>
+						<span class="divider-line"></span>
+					</div>
+					<ul>
+						{weekItems.map((rec) => (
+							<li>
+								<div class="entry">
+									<time class="date">{formatDate(rec.data.pubDate)}</time>
+									<span class="separator">—</span>
+									<a class="title" href={rec.data.url} target="_blank" rel="noreferrer">
+										{rec.data.title}
+									</a>
+								</div>
+							</li>
+						))}
+					</ul>
+				</>
+			)}
+
+			{olderItems.length > 0 && (
+				<>
+					<div class="section-divider">
+						<span class="divider-line"></span>
+						<span>Older</span>
+						<span class="divider-line"></span>
+					</div>
+					<ul>
+						{olderItems.map((rec) => (
+							<li>
+								<div class="entry">
+									<time class="date">{formatDate(rec.data.pubDate)}</time>
+									<span class="separator">—</span>
+									<a class="title" href={rec.data.url} target="_blank" rel="noreferrer">
+										{rec.data.title}
+									</a>
+								</div>
+							</li>
+						))}
+					</ul>
+				</>
+			)}
+
+			<p class="rss-link">
+				<a href="/recommended-reading/rss.xml">RSS feed</a>
+			</p>
+		</main>
+		<Footer />
+	</body>
+</html>

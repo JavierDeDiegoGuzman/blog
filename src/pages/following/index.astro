@@ -1,0 +1,160 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+import FeedReader from '../../components/islands/FeedReader';
+import { SITE_TITLE } from '../../consts';
+import feeds from '../../data/feeds.json';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`Following | ${SITE_TITLE}`} description="RSS feeds I follow" />
+		<style>
+			h1 {
+				margin-bottom: 0.5rem;
+			}
+
+			.description {
+				color: var(--color-text-muted);
+				margin-bottom: 2rem;
+			}
+
+			.controls {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 1.5rem;
+				flex-wrap: wrap;
+				gap: 1rem;
+			}
+
+			.filter {
+				display: flex;
+				gap: 0.5rem;
+				flex-wrap: wrap;
+			}
+
+			.filter button,
+			.refresh {
+				background: none;
+				border: 1px solid var(--color-border);
+				padding: 0.25rem 0.75rem;
+				font-size: 0.875rem;
+				font-family: inherit;
+				cursor: pointer;
+				color: var(--color-text-muted);
+				transition: all 150ms ease;
+			}
+
+			.filter button:hover,
+			.refresh:hover {
+				border-color: var(--color-text-muted);
+				color: var(--color-text);
+			}
+
+			.filter button.active {
+				background: var(--color-text);
+				color: var(--color-bg);
+				border-color: var(--color-text);
+			}
+
+			.refresh:disabled {
+				opacity: 0.5;
+				cursor: not-allowed;
+			}
+
+			.status {
+				color: var(--color-text-muted);
+			}
+
+			.status.error {
+				color: #666;
+			}
+
+			ul {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+
+			li {
+				margin-bottom: 0.75rem;
+			}
+
+			.entry {
+				display: flex;
+				gap: 0.5rem;
+				align-items: baseline;
+				flex-wrap: wrap;
+			}
+
+			.date {
+				font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+				font-size: 0.875rem;
+				color: var(--color-text-muted);
+				flex-shrink: 0;
+			}
+
+			.separator {
+				color: var(--color-text-muted);
+			}
+
+			.title {
+				color: var(--color-text);
+			}
+
+			.source {
+				font-size: 0.875rem;
+				color: var(--color-text-muted);
+			}
+
+			.feed-list {
+				margin-top: 3rem;
+				padding-top: 2rem;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.feed-list h2 {
+				font-size: 0.75rem;
+				font-weight: 400;
+				text-transform: uppercase;
+				letter-spacing: 0.1em;
+				color: var(--color-text-muted);
+				margin-bottom: 1rem;
+			}
+
+			.feed-list ul {
+				font-size: 0.875rem;
+			}
+
+			.feed-list li {
+				margin-bottom: 0.25rem;
+			}
+
+			.feed-list a {
+				color: var(--color-text-muted);
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<h1>Following</h1>
+			<p class="description">Latest posts from blogs I follow.</p>
+
+			<FeedReader client:load feeds={feeds.feeds} />
+
+			<div class="feed-list">
+				<h2>Feeds</h2>
+				<ul>
+					{feeds.feeds.map((feed) => (
+						<li><a href={feed.url} target="_blank" rel="noreferrer">{feed.name}</a></li>
+					))}
+				</ul>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>

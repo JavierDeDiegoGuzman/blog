@@ -1,0 +1,180 @@
+name: Add Content from Issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  add-recommendation:
+    if: contains(github.event.issue.labels.*.name, 'recommendation')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse issue and create recommendation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body;
+
+            // Parse form fields
+            const urlMatch = body.match(/### URL\s*\n\s*(.+)/);
+            const noteMatch = body.match(/### Note \(optional\)\s*\n\s*(.+)/);
+
+            if (!urlMatch) {
+              console.log('No URL found');
+              return;
+            }
+
+            const url = urlMatch[1].trim();
+            const note = noteMatch ? noteMatch[1].trim() : '';
+
+            // Fetch page to get title
+            let title = 'Untitled';
+            let author = '';
+            let source = '';
+
+            try {
+              const response = await fetch(url);
+              const html = await response.text();
+
+              // Extract title
+              const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+              if (titleMatch) {
+                title = titleMatch[1].trim()
+                  .replace(/\s*[|\-–—].*$/, '') // Remove site name suffix
+                  .replace(/&amp;/g, '&')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#39;/g, "'");
+              }
+
+              // Try to get author from meta
+              const authorMatch = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
+              if (authorMatch) {
+                author = authorMatch[1].trim();
+              }
+
+              // Get domain as source
+              const urlObj = new URL(url);
+              source = urlObj.hostname.replace('www.', '');
+            } catch (e) {
+              console.log('Error fetching URL:', e.message);
+            }
+
+            // Create filename
+            const slug = title.toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+              .substring(0, 50);
+            const date = new Date().toISOString().split('T')[0];
+            const filename = `src/content/recommendations/${slug}.md`;
+
+            // Create frontmatter
+            let content = `---\ntitle: "${title.replace(/"/g, '\\"')}"\nurl: ${url}\npubDate: ${date}\n`;
+            if (author) content += `author: ${author}\n`;
+            if (source) content += `source: ${source}\n`;
+            if (note && note !== '_No response_') content += `note: ${note}\n`;
+            content += `---\n`;
+
+            // Write file
+            const fs = require('fs');
+            fs.writeFileSync(filename, content);
+
+            // Set outputs for commit
+            core.exportVariable('FILENAME', filename);
+            core.exportVariable('TITLE', title);
+
+      - name: Commit and push
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add .
+          git commit -m "Add recommendation: $TITLE"
+          git push
+
+      - name: Close issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ Added to recommendations!'
+            });
+
+  add-feed:
+    if: contains(github.event.issue.labels.*.name, 'feed')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse issue and add feed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body;
+
+            // Parse form fields
+            const nameMatch = body.match(/### Name\s*\n\s*(.+)/);
+            const urlMatch = body.match(/### Feed URL\s*\n\s*(.+)/);
+
+            if (!nameMatch || !urlMatch) {
+              console.log('Missing name or URL');
+              return;
+            }
+
+            const name = nameMatch[1].trim();
+            const url = urlMatch[1].trim();
+
+            // Read current feeds
+            const fs = require('fs');
+            const feedsPath = 'src/data/feeds.json';
+            const feeds = JSON.parse(fs.readFileSync(feedsPath, 'utf8'));
+
+            // Add new feed
+            feeds.feeds.push({ name, url });
+
+            // Write back
+            fs.writeFileSync(feedsPath, JSON.stringify(feeds, null, 2) + '\n');
+
+            core.exportVariable('FEED_NAME', name);
+
+      - name: Commit and push
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add .
+          git commit -m "Add feed: $FEED_NAME"
+          git push
+
+      - name: Close issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ Added to feeds!'
+            });

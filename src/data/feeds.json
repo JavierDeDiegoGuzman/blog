@@ -1,0 +1,24 @@
+{
+  "feeds": [
+    {
+      "name": "Mario Zechner",
+      "url": "https://mariozechner.at/rss.xml"
+    },
+    {
+      "name": "Armin Ronacher",
+      "url": "https://lucumr.pocoo.org/feed.atom"
+    },
+    {
+      "name": "Cal Newport",
+      "url": "https://calnewport.com/feed/"
+    },
+    {
+      "name": "PlanetScale",
+      "url": "https://planetscale.xyz/blog/feed.atom"
+    },
+    {
+      "name": "David Cramer",
+      "url": "https://cra.mr/rss.xml"
+    }
+  ]
+}
